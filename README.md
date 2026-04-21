@@ -60,5 +60,5 @@ src/
 
 ## Paleta de colores
 
-Basada en (`rgb(204,0,74)`) + navy profundo (`#120E1F`).
+Basada en **Republicode** (`rgb(204,0,74)`) + navy profundo (`#120E1F`).
 Toggle de tema en la esquina del sidebar.
