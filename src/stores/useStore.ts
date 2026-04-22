@@ -50,6 +50,8 @@ interface FinanzasState extends FinanzasDB {
   updateInstallment: (id: string, i: Partial<Installment>) => void
   deleteInstallment: (id: string) => void
   payInstallment: (id: string) => void
+  payCard: (cardId: string, amount: number, accountName: string) => void
+  payDebt: (debtId: string, amount: number, accountName: string) => void
 }
 
 export const useStore = create<FinanzasState>()(
@@ -86,6 +88,48 @@ export const useStore = create<FinanzasState>()(
       addCard: (c) => set((s) => ({ cards: [...s.cards, { ...c, id: uid() }] })),
       updateCard: (id, c) => set((s) => ({ cards: s.cards.map((x) => x.id === id ? { ...x, ...c } : x) })),
       deleteCard: (id) => set((s) => ({ cards: s.cards.filter((x) => x.id !== id) })),
+
+      payCard: (cardId, amount, accountName) => {
+        set((s) => {
+          const card = s.cards.find((c) => c.id === cardId)
+          if (!card) return {}
+          const tx: Transaction = {
+            id: uid(),
+            date: new Date().toISOString().slice(0, 10),
+            desc: `Pago ${card.name}`,
+            cat: 'Pago tarjeta',
+            amount: -amount,
+            account: accountName,
+            type: 'expense',
+          }
+          return {
+            transactions: [...s.transactions, tx],
+            cards: s.cards.map((c) => c.id === cardId ? { ...c, balance: Math.max(0, c.balance - amount) } : c),
+            accounts: s.accounts.map((a) => a.name === accountName ? { ...a, balance: a.balance - amount } : a),
+          }
+        })
+      },
+
+      payDebt: (debtId, amount, accountName) => {
+        set((s) => {
+          const debt = s.debts.find((d) => d.id === debtId)
+          if (!debt) return {}
+          const tx: Transaction = {
+            id: uid(),
+            date: new Date().toISOString().slice(0, 10),
+            desc: `Pago ${debt.name}`,
+            cat: 'Pago deuda',
+            amount: -amount,
+            account: accountName,
+            type: 'expense',
+          }
+          return {
+            transactions: [...s.transactions, tx],
+            debts: s.debts.map((d) => d.id === debtId ? { ...d, remaining: Math.max(0, d.remaining - amount) } : d),
+            accounts: s.accounts.map((a) => a.name === accountName ? { ...a, balance: a.balance - amount } : a),
+          }
+        })
+      },
 
       // Transactions
       addTransaction: (t) => set((s) => ({ transactions: [...s.transactions, { ...t, id: uid() }] })),

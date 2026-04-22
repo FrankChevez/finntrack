@@ -15,6 +15,7 @@ const pages = [
   { id: 'recurrentes', label: 'Recurrentes', icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M2 8a6 6 0 1 0 6-6"/><path d="M8 2v3l2 1"/></svg> },
   { id: 'cuotas', label: 'Compras a cuotas', icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M1 7h14M4 10.5h2M8 10.5h2"/></svg> },
   { id: 'reporte', label: 'Reporte mensual', icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="2" y="1" width="12" height="14" rx="1.5"/><path d="M5 5h6M5 8h6M5 11h4"/></svg> },
+  { id: 'estados', label: 'Estados de cuenta', icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M1 7h14M4 10.5h2M8 10.5h2"/><path d="M4 5h3M10 5h2"/></svg> },
 ] as const
 
 interface Props {

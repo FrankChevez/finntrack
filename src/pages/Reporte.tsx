@@ -98,7 +98,10 @@ export default function Reporte() {
     ? Math.round(cards.reduce((s,c)=>s+(c.limit>0?c.balance/c.limit:0),0)/cards.length*100) : 0
 
   // ─── Emergency fund ────────────────────────────────────────────────────────
-  const totalSaved   = accounts.reduce((s,a)=>s+a.balance,0)
+  const emergAccounts = accounts.filter(a => a.emergencyFund)
+  const totalSaved = emergAccounts.length > 0
+    ? emergAccounts.reduce((s, a) => s + a.balance * ((a.emergencyPct ?? 100) / 100), 0)
+    : accounts.reduce((s, a) => s + a.balance, 0)
   const monthlyExp   = expense || 1
   const emergMonths  = parseFloat((totalSaved/monthlyExp).toFixed(1))
 
@@ -331,7 +334,7 @@ export default function Reporte() {
               <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false}/>
               <XAxis dataKey="name" tick={{fontSize:11,fill:axisColor}} axisLine={false} tickLine={false}/>
               <YAxis tick={{fontSize:10,fill:axisColor}} axisLine={false} tickLine={false}
-                tickFormatter={v=>`$${(v/1000).toFixed(0)}k`}/>
+                tickFormatter={v=>Math.abs(v)>=1000?`$${(v/1000).toFixed(1)}k`:`$${Math.round(v)}`}/>
               <Tooltip
                 formatter={(v, name)=>[fmt(Number(v)), String(name)]}
                 contentStyle={{background:ttBg,border:'0.5px solid var(--border-mid)',borderRadius:8,fontSize:12}}

@@ -10,9 +10,10 @@ import Reporte from './pages/Reporte'
 import { Cuentas } from './pages/Cuentas'
 import { Presupuestos, Metas, Deudas } from './pages/Objetivos'
 import { Transferencias, Recurrentes, Cuotas } from './pages/Herramientas'
+import { EstadoCuenta } from './pages/EstadoCuenta'
 import './styles/globals.css'
 
-type Page = 'dashboard'|'cuentas'|'gastos'|'presupuestos'|'metas'|'deudas'|'transferencias'|'recurrentes'|'cuotas'|'reporte'
+type Page = 'dashboard'|'cuentas'|'gastos'|'presupuestos'|'metas'|'deudas'|'transferencias'|'recurrentes'|'cuotas'|'reporte'|'estados'
 
 const ADD_LABELS: Partial<Record<Page,string>> = {
   gastos:       '+ Transacción',
@@ -49,6 +50,7 @@ export default function App() {
             {page === 'recurrentes'    && <Recurrentes />}
             {page === 'cuotas'         && <Cuotas />}
             {page === 'reporte'        && <Reporte />}
+            {page === 'estados'        && <EstadoCuenta />}
           </div>
         </div>
         <BottomNav current={page} onChange={(p) => setPage(p as Page)} />

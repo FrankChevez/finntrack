@@ -3,14 +3,16 @@ import { useState } from 'react'
 import { useStore } from '../stores/useStore'
 import { fmt } from '../lib/utils'
 import { Modal } from '../components/ui/Modal'
+import { PayModal } from '../components/ui/PayModal'
 import { useToast } from '../components/ui/Toast'
 import type { Account, Card } from '../types'
 
 export function Cuentas() {
-  const { accounts, cards, addAccount, updateAccount, deleteAccount, addCard, updateCard, deleteCard } = useStore()
+  const { accounts, cards, addAccount, updateAccount, deleteAccount, addCard, updateCard, deleteCard, payCard } = useStore()
   const { showToast } = useToast()
   const [editAcc, setEditAcc] = useState<Account|null|'new'>(null)
   const [editCard, setEditCard] = useState<Card|null|'new'>(null)
+  const [payingCard, setPayingCard] = useState<Card|null>(null)
 
   const totalBanks = accounts.reduce((s,a)=>s+a.balance,0)
   const totalDebt  = cards.reduce((s,c)=>s+c.balance,0)
@@ -80,8 +82,9 @@ export function Cuentas() {
                   <div style={{fontFamily:'DM Mono,monospace',fontSize:14,color:'var(--neg)'}}>{fmt(c.balance)}</div>
                   <div style={{fontSize:10,color:'var(--text-muted)'}}>de {fmt(c.limit)}</div>
                 </div>
-                <button className="btn btn-ghost btn-sm" onClick={()=>setEditCard(c)}>Editar</button>
-                <button className="btn btn-danger btn-sm" onClick={()=>{ deleteCard(c.id); showToast('Tarjeta eliminada') }}>×</button>
+                <button type="button" className="btn btn-accent btn-sm" onClick={() => setPayingCard(c)}>Pagar</button>
+                <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditCard(c)}>Editar</button>
+                <button type="button" className="btn btn-danger btn-sm" onClick={()=>{ deleteCard(c.id); showToast('Tarjeta eliminada') }}>×</button>
               </div>
               <div className="progress">
                 <div className="progress-fill" style={{width:`${util}%`,background:util>80?'var(--neg)':util>50?'var(--warn)':'var(--pos)'}}/>
@@ -110,12 +113,26 @@ export function Cuentas() {
           onSave={(c)=>{ editCard==='new'?addCard(c):updateCard((editCard as Card).id,c); showToast('Guardado'); setEditCard(null) }}
         />
       )}
+
+      {payingCard && (
+        <PayModal
+          title={`Pagar ${payingCard.name}`}
+          maxAmount={payingCard.balance}
+          accounts={accounts}
+          onConfirm={(amount, accountName) => {
+            payCard(payingCard.id, amount, accountName)
+            showToast(`Pago de ${payingCard.name} registrado`)
+            setPayingCard(null)
+          }}
+          onClose={() => setPayingCard(null)}
+        />
+      )}
     </div>
   )
 }
 
 function AccountModal({ acc, onClose, onSave }: { acc?: Account; onClose:()=>void; onSave:(a:Omit<Account,'id'>)=>void }) {
-  const [form,setForm]=useState({ name:acc?.name??'', type:acc?.type??'savings' as Account['type'], balance:acc?.balance?.toString()??'0', color:acc?.color??'#6c8fff' })
+  const [form,setForm]=useState({ name:acc?.name??'', type:acc?.type??'savings' as Account['type'], balance:acc?.balance?.toString()??'0', color:acc?.color??'#6c8fff', emergencyFund:acc?.emergencyFund??false, emergencyPct:acc?.emergencyPct?.toString()??'100' })
   const s=(k:string,v:string)=>setForm(f=>({...f,[k]:v}))
   return (
     <Modal title={acc?'Editar cuenta':'Nueva cuenta'} onClose={onClose}>
@@ -129,9 +146,32 @@ function AccountModal({ acc, onClose, onSave }: { acc?: Account; onClose:()=>voi
         <div className="form-group"><label className="form-label">Balance ($)</label><input className="form-input" type="number" step="0.01" value={form.balance} onChange={e=>s('balance',e.target.value)}/></div>
       </div>
       <div className="form-group"><label className="form-label">Color</label><input type="color" value={form.color} onChange={e=>s('color',e.target.value)} style={{width:'100%',height:36,borderRadius:8,border:'0.5px solid var(--border-mid)',cursor:'pointer'}}/></div>
+      <div className="form-group">
+        <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+          <input
+            type="checkbox"
+            checked={form.emergencyFund}
+            onChange={e => setForm(f => ({ ...f, emergencyFund: e.target.checked }))}
+          />
+          <span className="form-label" style={{ margin: 0 }}>Fondo de emergencia</span>
+        </label>
+      </div>
+      {form.emergencyFund && (
+        <div className="form-group">
+          <label className="form-label">% que cuenta como fondo (1–100)</label>
+          <input
+            className="form-input"
+            type="number"
+            min="1"
+            max="100"
+            value={form.emergencyPct}
+            onChange={e => setForm(f => ({ ...f, emergencyPct: e.target.value }))}
+          />
+        </div>
+      )}
       <div className="form-actions">
         <button className="btn" onClick={onClose}>Cancelar</button>
-        <button className="btn btn-accent" onClick={()=>onSave({name:form.name,type:form.type as Account['type'],balance:parseFloat(form.balance)||0,color:form.color})}>Guardar</button>
+        <button className="btn btn-accent" onClick={()=>onSave({name:form.name,type:form.type as Account['type'],balance:parseFloat(form.balance)||0,color:form.color,emergencyFund:form.emergencyFund||undefined,emergencyPct:form.emergencyFund?(parseInt(form.emergencyPct)||100):undefined})}>Guardar</button>
       </div>
     </Modal>
   )

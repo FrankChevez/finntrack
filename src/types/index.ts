@@ -11,6 +11,8 @@ export interface Account {
   type: AccountType
   balance: number
   color: string
+  emergencyFund?: boolean
+  emergencyPct?: number
 }
 
 export interface Card {

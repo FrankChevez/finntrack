@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useStore } from '../stores/useStore'
 import { fmt, currentYM, prevYM, nextYM, ymLabel } from '../lib/utils'
 import { Modal } from '../components/ui/Modal'
+import { PayModal } from '../components/ui/PayModal'
 import { useToast } from '../components/ui/Toast'
 import { CATS, type Budget, type Goal, type Debt } from '../types'
 
@@ -181,9 +182,10 @@ function GoalForm({ goal, onSave, onClose }: { goal?:Goal; onSave:(g:Omit<Goal,'
 
 // ─── Deudas ───────────────────────────────────────────────────────────────────
 export function Deudas() {
-  const { debts, addDebt, updateDebt, deleteDebt } = useStore()
+  const { debts, accounts, addDebt, updateDebt, deleteDebt, payDebt } = useStore()
   const { showToast } = useToast()
   const [editing, setEditing] = useState<Debt|null|'new'>(null)
+  const [payingDebt, setPayingDebt] = useState<Debt|null>(null)
 
   const totalRemaining = debts.reduce((s,d)=>s+d.remaining,0)
   const totalMonthly   = debts.reduce((s,d)=>s+d.monthly,0)
@@ -226,8 +228,9 @@ export function Deudas() {
               <div style={{display:'flex',justifyContent:'space-between',marginTop:3}}>
                 <span style={{fontSize:10,color:'var(--text-muted)'}}>{pct}% pagado</span>
                 <div style={{display:'flex',gap:6}}>
-                  <button className="btn btn-ghost btn-sm" onClick={()=>setEditing(d)}>Editar</button>
-                  <button className="btn btn-danger btn-sm" onClick={()=>{ deleteDebt(d.id); showToast('Deuda eliminada') }}>×</button>
+                  <button type="button" className="btn btn-accent btn-sm" onClick={() => setPayingDebt(d)}>Pagar</button>
+                  <button type="button" className="btn btn-ghost btn-sm" onClick={()=>setEditing(d)}>Editar</button>
+                  <button type="button" className="btn btn-danger btn-sm" onClick={()=>{ deleteDebt(d.id); showToast('Deuda eliminada') }}>×</button>
                 </div>
               </div>
             </div>
@@ -240,6 +243,19 @@ export function Deudas() {
         <Modal title={editing==='new'?'Nueva deuda':'Editar deuda'} onClose={()=>setEditing(null)}>
           <DebtForm debt={editing==='new'?undefined:editing} onSave={(d)=>{ editing==='new'?addDebt(d):updateDebt((editing as Debt).id,d); showToast('Guardado'); setEditing(null) }} onClose={()=>setEditing(null)}/>
         </Modal>
+      )}
+      {payingDebt !== null && (
+        <PayModal
+          title={`Pagar ${payingDebt.name}`}
+          maxAmount={payingDebt.remaining}
+          accounts={accounts}
+          onConfirm={(amount, accountName) => {
+            payDebt(payingDebt.id, amount, accountName)
+            showToast(`Pago de ${payingDebt.name} registrado`)
+            setPayingDebt(null)
+          }}
+          onClose={() => setPayingDebt(null)}
+        />
       )}
     </div>
   )
