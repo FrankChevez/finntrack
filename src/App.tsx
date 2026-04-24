@@ -11,11 +11,13 @@ import { Cuentas } from './pages/Cuentas'
 import { Presupuestos, Metas, Deudas } from './pages/Objetivos'
 import { Transferencias, Recurrentes, Cuotas } from './pages/Herramientas'
 import { EstadoCuenta } from './pages/EstadoCuenta'
+import Asistente from './pages/Asistente'
+import WrappedPage from './pages/WrappedPage'
 import { useAutoWrapped } from './hooks/useAutoWrapped'
 import { WrappedView } from './components/wrapped/WrappedView'
 import './styles/globals.css'
 
-type Page = 'dashboard'|'cuentas'|'gastos'|'presupuestos'|'metas'|'deudas'|'transferencias'|'recurrentes'|'cuotas'|'reporte'|'estados'
+type Page = 'dashboard'|'cuentas'|'gastos'|'presupuestos'|'metas'|'deudas'|'transferencias'|'recurrentes'|'cuotas'|'reporte'|'estados'|'asistente'|'wrapped'
 
 const ADD_LABELS: Partial<Record<Page,string>> = {
   gastos:       '+ Transacción',
@@ -29,7 +31,7 @@ const ADD_LABELS: Partial<Record<Page,string>> = {
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard')
-  const { theme, accounts, cards, transactions, budgets, goals, debts, recurring, transfers, installments } = useStore()
+  const { theme, accounts, cards, transactions, budgets, goals, debts, recurring, transfers, installments, assistantMessages } = useStore()
   const { target, markSeen } = useAutoWrapped(transactions)
 
   useEffect(() => {
@@ -54,6 +56,8 @@ export default function App() {
             {page === 'cuotas'         && <Cuotas />}
             {page === 'reporte'        && <Reporte />}
             {page === 'estados'        && <EstadoCuenta />}
+            {page === 'asistente'      && <Asistente />}
+            {page === 'wrapped'        && <WrappedPage />}
           </div>
         </div>
         <BottomNav current={page} onChange={(p) => setPage(p as Page)} />
@@ -62,7 +66,7 @@ export default function App() {
         <WrappedView
           type={target.type}
           period={target.period}
-          db={{ accounts, cards, transactions, budgets, goals, debts, recurring, transfers, installments }}
+          db={{ accounts, cards, transactions, budgets, goals, debts, recurring, transfers, installments, assistantMessages }}
           onClose={() => markSeen(target)}
         />
       )}

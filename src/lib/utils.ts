@@ -1,4 +1,4 @@
-import type { FinanzasDB, Account, Transaction } from '../types'
+import type { FinanzasDB, Account, Transaction, AssistantMessage } from '../types'
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
 
@@ -97,6 +97,7 @@ export function defaultData(): FinanzasDB {
     ],
     transfers: [],
     installments: [],
+    assistantMessages: [],
   }
 }
 
@@ -115,6 +116,7 @@ export function validateAndMigrateDB(raw: unknown): FinanzasDB {
     recurring:    Array.isArray(r.recurring)     ? r.recurring    : base.recurring,
     transfers:    Array.isArray(r.transfers)     ? r.transfers    : [],
     installments: Array.isArray(r.installments) ? r.installments : [],
+    assistantMessages: Array.isArray(r.assistantMessages) ? r.assistantMessages as AssistantMessage[] : [],
   }
 }
 

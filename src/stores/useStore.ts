@@ -1,6 +1,6 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
-import type { FinanzasDB, Account, Card, Transaction, Budget, Goal, Debt, RecurringItem, Transfer, Installment } from '../types'
+import type { FinanzasDB, Account, Card, Transaction, Budget, Goal, Debt, RecurringItem, Transfer, Installment, AssistantMessage } from '../types'
 import { defaultData, uid, validateAndMigrateDB } from '../lib/utils'
 
 type Theme = 'light' | 'dark'
@@ -53,6 +53,9 @@ interface FinanzasState extends FinanzasDB {
   payInstallment: (id: string) => void
   payCard: (cardId: string, amount: number, accountName: string) => void
   payDebt: (debtId: string, amount: number, accountName: string) => void
+  // ─── Asistente ───
+  addAssistantMessage: (m: Omit<AssistantMessage, 'id'|'timestamp'>) => void
+  clearAssistantMessages: () => void
 }
 
 export const useStore = create<FinanzasState>()(
@@ -132,10 +135,71 @@ export const useStore = create<FinanzasState>()(
         })
       },
 
+      // Asistente
+      addAssistantMessage: (m) => set((s) => ({
+        assistantMessages: [...s.assistantMessages, { ...m, id: uid(), timestamp: Date.now() }],
+      })),
+      clearAssistantMessages: () => set({ assistantMessages: [] }),
+
       // Transactions
-      addTransaction: (t) => set((s) => ({ transactions: [...s.transactions, { ...t, id: uid() }] })),
-      updateTransaction: (id, t) => set((s) => ({ transactions: s.transactions.map((x) => x.id === id ? { ...x, ...t } : x) })),
-      deleteTransaction: (id) => set((s) => ({ transactions: s.transactions.filter((x) => x.id !== id) })),
+      // Accounts: balance += amount (income up, expense down). Cards: balance -= amount (charge grows debt, payment shrinks debt, clamped to 0).
+      addTransaction: (t) => set((s) => {
+        const newTx = { ...t, id: uid() }
+        const inAccount = s.accounts.some((a) => a.name === t.account)
+        const inCard = !inAccount && s.cards.some((c) => c.name === t.account)
+        return {
+          transactions: [...s.transactions, newTx],
+          accounts: inAccount
+            ? s.accounts.map((a) => a.name === t.account ? { ...a, balance: a.balance + t.amount } : a)
+            : s.accounts,
+          cards: inCard
+            ? s.cards.map((c) => c.name === t.account ? { ...c, balance: Math.max(0, c.balance - t.amount) } : c)
+            : s.cards,
+        }
+      }),
+      updateTransaction: (id, t) => set((s) => {
+        const oldTx = s.transactions.find((x) => x.id === id)
+        if (!oldTx) return {}
+        const newTx = { ...oldTx, ...t }
+
+        let accounts = s.accounts
+        let cards = s.cards
+
+        // Revert old transaction's effect
+        if (accounts.some((a) => a.name === oldTx.account)) {
+          accounts = accounts.map((a) => a.name === oldTx.account ? { ...a, balance: a.balance - oldTx.amount } : a)
+        } else if (cards.some((c) => c.name === oldTx.account)) {
+          cards = cards.map((c) => c.name === oldTx.account ? { ...c, balance: Math.max(0, c.balance + oldTx.amount) } : c)
+        }
+
+        // Apply new transaction's effect
+        if (accounts.some((a) => a.name === newTx.account)) {
+          accounts = accounts.map((a) => a.name === newTx.account ? { ...a, balance: a.balance + newTx.amount } : a)
+        } else if (cards.some((c) => c.name === newTx.account)) {
+          cards = cards.map((c) => c.name === newTx.account ? { ...c, balance: Math.max(0, c.balance - newTx.amount) } : c)
+        }
+
+        return {
+          transactions: s.transactions.map((x) => x.id === id ? newTx : x),
+          accounts,
+          cards,
+        }
+      }),
+      deleteTransaction: (id) => set((s) => {
+        const tx = s.transactions.find((x) => x.id === id)
+        if (!tx) return {}
+        const inAccount = s.accounts.some((a) => a.name === tx.account)
+        const inCard = !inAccount && s.cards.some((c) => c.name === tx.account)
+        return {
+          transactions: s.transactions.filter((x) => x.id !== id),
+          accounts: inAccount
+            ? s.accounts.map((a) => a.name === tx.account ? { ...a, balance: a.balance - tx.amount } : a)
+            : s.accounts,
+          cards: inCard
+            ? s.cards.map((c) => c.name === tx.account ? { ...c, balance: Math.max(0, c.balance + tx.amount) } : c)
+            : s.cards,
+        }
+      }),
 
       // Budgets
       addBudget: (b) => set((s) => ({ budgets: [...s.budgets, { ...b, id: uid() }] })),

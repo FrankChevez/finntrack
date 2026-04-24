@@ -94,6 +94,20 @@ export interface Installment {
   paid: number        // cuotas paid so far
 }
 
+export interface AssistantMessageItem {
+  main: string
+  sub?: string
+  amount?: string
+}
+
+export interface AssistantMessage {
+  id: string
+  role: 'user' | 'bot'
+  text: string
+  list?: AssistantMessageItem[]
+  timestamp: number
+}
+
 // ─── Root DB shape — matches localStorage key 'misfinanzas_v1' exactly ─────
 export interface FinanzasDB {
   accounts: Account[]
@@ -105,6 +119,7 @@ export interface FinanzasDB {
   recurring: RecurringItem[]
   transfers: Transfer[]
   installments: Installment[]
+  assistantMessages: AssistantMessage[]
 }
 
 export const CATS = [
