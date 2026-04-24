@@ -42,6 +42,13 @@ const MORE_SECTIONS = [
       { id: 'estados', label: 'Estados', icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="1" y="3" width="14" height="10" rx="1.5"/><path d="M1 7h14M4 10.5h2M8 10.5h2"/><path d="M4 5h3M10 5h2"/></svg> },
     ],
   },
+  {
+    label: 'Extras',
+    items: [
+      { id: 'asistente', label: 'Asistente', icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="5" width="10" height="8" rx="2"/><circle cx="6.5" cy="9" r="0.8" fill="currentColor"/><circle cx="9.5" cy="9" r="0.8" fill="currentColor"/><path d="M8 5V2M6.5 2h3"/></svg> },
+      { id: 'wrapped',   label: 'Wrapped',   icon: <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.5"><path d="M8 2l1.5 4 4 0.5-3 2.8 0.9 4.2L8 11.5 4.6 13.5l0.9-4.2-3-2.8 4-0.5z"/></svg> },
+    ],
+  },
 ]
 
 const MORE_IDS = MORE_SECTIONS.flatMap(s => s.items.map(i => i.id))
