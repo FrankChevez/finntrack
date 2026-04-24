@@ -1,86 +1,10 @@
 import { useMemo, useState } from 'react'
 import { useStore } from '../stores/useStore'
 import { fmt, currentYM, ymLabel } from '../lib/utils'
-import { Modal } from '../components/ui/Modal'
+import { TransactionModal } from '../components/ui/TransactionModal'
 import { useToast } from '../components/ui/Toast'
 import { CATS, type Transaction } from '../types'
-
-function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => void }) {
-  const { addTransaction, updateTransaction, accounts, cards } = useStore()
-  const { showToast } = useToast()
-  const allAccounts = [...accounts.map(a=>a.name), ...cards.map(c=>c.name)]
-
-  const [form, setForm] = useState({
-    date:    tx?.date    ?? new Date().toISOString().slice(0,10),
-    desc:    tx?.desc    ?? '',
-    cat:     tx?.cat     ?? 'Alimentación',
-    amount:  tx ? Math.abs(tx.amount).toString() : '',
-    account: tx?.account ?? (allAccounts[0] ?? ''),
-    type:    tx?.type    ?? 'expense' as 'income'|'expense',
-  })
-
-  const set = (k: string, v: string) => setForm(f=>({...f,[k]:v}))
-
-  const save = () => {
-    if (!form.desc || !form.amount || !form.account) { showToast('Completa todos los campos'); return }
-    const amount = parseFloat(form.amount) * (form.type==='expense' ? -1 : 1)
-    if (tx) {
-      updateTransaction(tx.id, { ...form, amount, type: form.type })
-    } else {
-      addTransaction({ ...form, amount, type: form.type })
-    }
-    showToast(tx ? 'Transacción actualizada' : 'Transacción agregada')
-    onClose()
-  }
-
-  return (
-    <Modal title={tx ? 'Editar transacción' : 'Nueva transacción'} onClose={onClose}>
-      <div className="form-group">
-        <label className="form-label">Tipo</label>
-        <div style={{display:'flex',gap:8}}>
-          {(['expense','income'] as const).map(t=>(
-            <button key={t} className={`btn${form.type===t?' btn-accent':''}`} style={{flex:1}}
-              onClick={()=>set('type',t)}>
-              {t==='expense'?'Gasto':'Ingreso'}
-            </button>
-          ))}
-        </div>
-      </div>
-      <div className="form-row">
-        <div className="form-group">
-          <label className="form-label">Fecha</label>
-          <input className="form-input" type="date" value={form.date} onChange={e=>set('date',e.target.value)}/>
-        </div>
-        <div className="form-group">
-          <label className="form-label">Monto ($)</label>
-          <input className="form-input" type="number" step="0.01" placeholder="0.00" value={form.amount} onChange={e=>set('amount',e.target.value)}/>
-        </div>
-      </div>
-      <div className="form-group">
-        <label className="form-label">Descripción</label>
-        <input className="form-input" placeholder="Ej: Supermercado La Colonia" value={form.desc} onChange={e=>set('desc',e.target.value)}/>
-      </div>
-      <div className="form-row">
-        <div className="form-group">
-          <label className="form-label">Categoría</label>
-          <select className="form-select" value={form.cat} onChange={e=>set('cat',e.target.value)}>
-            {CATS.map(c=><option key={c}>{c}</option>)}
-          </select>
-        </div>
-        <div className="form-group">
-          <label className="form-label">Cuenta / Tarjeta</label>
-          <select className="form-select" value={form.account} onChange={e=>set('account',e.target.value)}>
-            {allAccounts.map(a=><option key={a}>{a}</option>)}
-          </select>
-        </div>
-      </div>
-      <div className="form-actions">
-        <button className="btn" onClick={onClose}>Cancelar</button>
-        <button className="btn btn-accent" onClick={save}>Guardar</button>
-      </div>
-    </Modal>
-  )
-}
+import { Search, X } from 'lucide-react'
 
 export default function Gastos() {
   const { transactions, deleteTransaction } = useStore()
@@ -89,6 +13,7 @@ export default function Gastos() {
     transactions.some(t => t.date.startsWith(currentYM())) ? currentYM() : ''
   )
   const [filterCat, setFilterCat] = useState('')
+  const [filterSearch, setFilterSearch] = useState('')
   const [editing, setEditing] = useState<Transaction | undefined>()
   const [adding, setAdding] = useState(false)
 
@@ -97,12 +22,14 @@ export default function Gastos() {
     return [...set].sort().reverse()
   }, [transactions])
 
-  const filtered = useMemo(() =>
-    transactions.filter(t =>
+  const filtered = useMemo(() => {
+    const search = filterSearch.trim().toLowerCase()
+    return transactions.filter(t =>
       (filterMonth ? t.date.startsWith(filterMonth) : true) &&
-      (filterCat   ? t.cat === filterCat             : true)
-    ).sort((a,b)=>b.date.localeCompare(a.date)),
-    [transactions, filterMonth, filterCat])
+      (filterCat   ? t.cat === filterCat             : true) &&
+      (search      ? t.desc.toLowerCase().includes(search) : true)
+    ).sort((a, b) => b.date.localeCompare(a.date))
+  }, [transactions, filterMonth, filterCat, filterSearch])
 
   const income  = filtered.filter(t=>t.amount>0).reduce((s,t)=>s+t.amount,0)
   const expense = Math.abs(filtered.filter(t=>t.amount<0).reduce((s,t)=>s+t.amount,0))
@@ -137,19 +64,41 @@ export default function Gastos() {
       <div className="card">
         <div className="card-header">
           <span className="card-title">Transacciones ({filtered.length})</span>
-          <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap'}}>
-            <select className="form-select" style={{width:'auto',padding:'5px 10px',fontSize:12}}
-              value={filterMonth} onChange={e=>setFilterMonth(e.target.value)}>
-              <option value="">Todos los meses</option>
-              {months.map(m=><option key={m} value={m}>{ymLabel(m)}</option>)}
-            </select>
-            <select className="form-select" style={{width:'auto',padding:'5px 10px',fontSize:12}}
-              value={filterCat} onChange={e=>setFilterCat(e.target.value)}>
-              <option value="">Todas las categorías</option>
-              {CATS.map(c=><option key={c}>{c}</option>)}
-            </select>
-            <button className="btn btn-accent btn-sm" onClick={()=>setAdding(true)}>+ Agregar</button>
+          <button className="btn btn-accent btn-sm" onClick={()=>setAdding(true)}>+ Agregar</button>
+        </div>
+
+        <div className="gastos-filters-row">
+          <div className="search-input-wrap">
+            <Search size={14} strokeWidth={1.8} className="search-input-icon" />
+            <input
+              className="form-input search-input"
+              type="text"
+              placeholder="Buscar por descripción..."
+              value={filterSearch}
+              onChange={e => setFilterSearch(e.target.value)}
+              aria-label="Buscar transacciones"
+            />
+            {filterSearch && (
+              <button
+                type="button"
+                className="search-input-clear"
+                onClick={() => setFilterSearch('')}
+                aria-label="Limpiar búsqueda"
+              >
+                <X size={14} strokeWidth={2} />
+              </button>
+            )}
           </div>
+          <select className="form-select" style={{width:'auto',padding:'5px 10px',fontSize:12}}
+            value={filterMonth} onChange={e=>setFilterMonth(e.target.value)}>
+            <option value="">Todos los meses</option>
+            {months.map(m=><option key={m} value={m}>{ymLabel(m)}</option>)}
+          </select>
+          <select className="form-select" style={{width:'auto',padding:'5px 10px',fontSize:12}}
+            value={filterCat} onChange={e=>setFilterCat(e.target.value)}>
+            <option value="">Todas las categorías</option>
+            {CATS.map(c=><option key={c}>{c}</option>)}
+          </select>
         </div>
 
         {filtered.length > 0 ? filtered.map(tx=>(

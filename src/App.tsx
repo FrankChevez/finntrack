@@ -3,6 +3,8 @@ import { useStore } from './stores/useStore'
 import { Sidebar } from './components/layout/Sidebar'
 import { Topbar } from './components/layout/Topbar'
 import { BottomNav } from './components/layout/BottomNav'
+import { FAB } from './components/layout/FAB'
+import { TransactionModal } from './components/ui/TransactionModal'
 import { ToastProvider } from './components/ui/Toast'
 import Dashboard from './pages/Dashboard'
 import Gastos from './pages/Gastos'
@@ -31,6 +33,7 @@ const ADD_LABELS: Partial<Record<Page,string>> = {
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard')
+  const [quickAddOpen, setQuickAddOpen] = useState(false)
   const { theme, accounts, cards, transactions, budgets, goals, debts, recurring, transfers, installments, assistantMessages } = useStore()
   const { target, markSeen } = useAutoWrapped(transactions)
 
@@ -62,7 +65,16 @@ export default function App() {
         </div>
         <BottomNav current={page} onChange={(p) => setPage(p as Page)} />
       </div>
-      {target && (
+
+    {!target && (
+      <FAB onClick={() => setQuickAddOpen(true)} />
+    )}
+
+    {quickAddOpen && (
+      <TransactionModal onClose={() => setQuickAddOpen(false)} />
+    )}
+
+    {target && (
         <WrappedView
           type={target.type}
           period={target.period}
