@@ -85,7 +85,9 @@ function TransactionModal({ tx, onClose }: { tx?: Transaction; onClose: () => vo
 export default function Gastos() {
   const { transactions, deleteTransaction } = useStore()
   const { showToast } = useToast()
-  const [filterMonth, setFilterMonth] = useState(currentYM())
+  const [filterMonth, setFilterMonth] = useState(() =>
+    transactions.some(t => t.date.startsWith(currentYM())) ? currentYM() : ''
+  )
   const [filterCat, setFilterCat] = useState('')
   const [editing, setEditing] = useState<Transaction | undefined>()
   const [adding, setAdding] = useState(false)

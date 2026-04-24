@@ -48,6 +48,7 @@ export interface Goal {
   saved: number
   deadline: string    // 'YYYY-MM-DD'
   color: string
+  accountId?: string  // opcional — id de la cuenta donde se ahorra esta meta
 }
 
 export interface Debt {

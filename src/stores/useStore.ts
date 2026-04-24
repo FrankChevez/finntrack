@@ -33,6 +33,7 @@ interface FinanzasState extends FinanzasDB {
   addGoal: (g: Omit<Goal, 'id'>) => void
   updateGoal: (id: string, g: Partial<Goal>) => void
   deleteGoal: (id: string) => void
+  contributeToGoal: (goalId: string, amount: number, fromAccountName: string) => void
   // ─── Debts ───
   addDebt: (d: Omit<Debt, 'id'>) => void
   updateDebt: (id: string, d: Partial<Debt>) => void
@@ -145,6 +146,44 @@ export const useStore = create<FinanzasState>()(
       addGoal: (g) => set((s) => ({ goals: [...s.goals, { ...g, id: uid() }] })),
       updateGoal: (id, g) => set((s) => ({ goals: s.goals.map((x) => x.id === id ? { ...x, ...g } : x) })),
       deleteGoal: (id) => set((s) => ({ goals: s.goals.filter((x) => x.id !== id) })),
+
+      contributeToGoal: (goalId, amount, fromAccountName) => {
+        set((s) => {
+          const goal = s.goals.find((g) => g.id === goalId)
+          if (!goal) return {}
+
+          const goalAccount = goal.accountId
+            ? s.accounts.find((a) => a.id === goal.accountId)
+            : undefined
+          const needsTransfer = goalAccount && fromAccountName !== goalAccount.name
+
+          let accounts = s.accounts
+          let transfers = s.transfers
+
+          if (needsTransfer) {
+            accounts = s.accounts.map((a) => {
+              if (a.name === fromAccountName) return { ...a, balance: a.balance - amount }
+              if (a.name === goalAccount.name) return { ...a, balance: a.balance + amount }
+              return a
+            })
+            const transfer: Transfer = {
+              id: uid(),
+              date: new Date().toISOString().slice(0, 10),
+              from: fromAccountName,
+              to: goalAccount.name,
+              amount,
+              note: `Aporte a meta: ${goal.name}`,
+            }
+            transfers = [...s.transfers, transfer]
+          }
+
+          const goals = s.goals.map((g) =>
+            g.id === goalId ? { ...g, saved: g.saved + amount } : g
+          )
+
+          return { accounts, transfers, goals }
+        })
+      },
 
       // Debts
       addDebt: (d) => set((s) => ({ debts: [...s.debts, { ...d, id: uid() }] })),

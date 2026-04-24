@@ -1,15 +1,16 @@
 import { useMemo } from 'react'
 import { useStore } from '../stores/useStore'
-import { fmt, currentYM, prevYM, ymLabel } from '../lib/utils'
+import { fmt, currentYM, prevYM, ymLabel, emergencyFundHistory } from '../lib/utils'
 import {
   PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
   BarChart, Bar, XAxis, YAxis, CartesianGrid,
+  LineChart, Line,
 } from 'recharts'
 
 const CAT_COLORS = ['#cc004a','#1A4FB8','#5B3FA8','#157A45','#9A5A00','#6898FF','#30D47A','#F5A623']
 
 export default function Dashboard({ onNavigate }: { onNavigate: (p: string) => void }) {
-  const { transactions, accounts, cards, theme } = useStore()
+  const { transactions, accounts, cards, goals, theme } = useStore()
   const ym  = currentYM()
   const pym = prevYM(ym)
 
@@ -51,6 +52,27 @@ export default function Dashboard({ onNavigate }: { onNavigate: (p: string) => v
   const recent = useMemo(() =>
     [...transactions].sort((a,b)=>b.date.localeCompare(a.date)).slice(0,7),
     [transactions])
+
+  const emergencyData = useMemo(() => {
+    const emergencyAccounts = accounts.filter(a => a.emergencyFund)
+    if (emergencyAccounts.length === 0) return null
+
+    const total = emergencyAccounts.reduce(
+      (s, a) => s + a.balance * ((a.emergencyPct ?? 100) / 100),
+      0
+    )
+
+    const history = emergencyFundHistory(accounts, transactions, 6)
+
+    const emergencyAccountIds = new Set(emergencyAccounts.map(a => a.id))
+    const linkedByAccount = goals.find(g => g.accountId && emergencyAccountIds.has(g.accountId))
+    const linkedByName = goals.find(g =>
+      g.name.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().includes('emergencia')
+    )
+    const linkedGoal = linkedByAccount ?? linkedByName ?? null
+
+    return { total, history, linkedGoal }
+  }, [accounts, transactions, goals])
 
   const isDark = theme === 'dark'
   const axisColor = isDark ? '#4A4070' : '#8078A8'
@@ -98,6 +120,54 @@ export default function Dashboard({ onNavigate }: { onNavigate: (p: string) => v
           <div className="metric-bar"><div className="metric-bar-fill" style={{width:`${Math.min(100,savingsRate*2)}%`,background:'var(--purple)'}}/></div>
         </div>
       </div>
+
+      {emergencyData && (
+        <div className="card mb">
+          <div className="card-header">
+            <span className="card-title">Fondo de emergencia</span>
+          </div>
+          <div style={{display:'grid',gridTemplateColumns:'minmax(180px,240px) 1fr',gap:20,alignItems:'center'}}>
+            <div>
+              <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:4}}>Actual</div>
+              <div style={{fontSize:24,fontFamily:'DM Mono,monospace',fontWeight:600,color:'var(--accent)'}}>
+                {fmt(emergencyData.total)}
+              </div>
+              {emergencyData.linkedGoal && (
+                <>
+                  <div style={{fontSize:11,color:'var(--text-muted)',marginTop:10}}>
+                    Meta: {fmt(emergencyData.linkedGoal.target)}
+                  </div>
+                  <div className="progress" style={{marginTop:4}}>
+                    <div
+                      className="progress-fill"
+                      style={{
+                        width:`${Math.min(100,(emergencyData.total/emergencyData.linkedGoal.target)*100)}%`,
+                        background:emergencyData.linkedGoal.color,
+                      }}
+                    />
+                  </div>
+                  <div style={{fontSize:10,color:'var(--text-muted)',marginTop:3}}>
+                    {emergencyData.total>=emergencyData.linkedGoal.target
+                      ? '✓ Meta alcanzada'
+                      : `${Math.round((emergencyData.total/emergencyData.linkedGoal.target)*100)}% completado`}
+                  </div>
+                </>
+              )}
+            </div>
+            <div className="chart-wrap" style={{height:140}}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={emergencyData.history.map(p=>({ name: ymLabel(p.month).slice(0,3), total: p.total }))}>
+                  <CartesianGrid strokeDasharray="3 3" stroke={gridColor} vertical={false}/>
+                  <XAxis dataKey="name" tick={{fontSize:11,fill:axisColor}} axisLine={false} tickLine={false}/>
+                  <YAxis tick={{fontSize:10,fill:axisColor}} axisLine={false} tickLine={false} tickFormatter={(v)=>`$${(v/1000).toFixed(1)}k`}/>
+                  <Tooltip formatter={(v)=>[fmt(Number(v)),'']} contentStyle={{background:isDark?'#120E1F':'#fff',border:'0.5px solid var(--border-mid)',borderRadius:8,fontSize:12}}/>
+                  <Line type="monotone" dataKey="total" stroke="var(--accent)" strokeWidth={2} dot={{r:3}} activeDot={{r:5}}/>
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid2 mb">
         <div className="card">

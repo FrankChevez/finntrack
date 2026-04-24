@@ -3,8 +3,9 @@ import { useStore } from '../stores/useStore'
 import { fmt, currentYM, prevYM, nextYM, ymLabel } from '../lib/utils'
 import { Modal } from '../components/ui/Modal'
 import { PayModal } from '../components/ui/PayModal'
+import { ContributeGoalModal } from '../components/ui/ContributeGoalModal'
 import { useToast } from '../components/ui/Toast'
-import { CATS, type Budget, type Goal, type Debt } from '../types'
+import { CATS, type Budget, type Goal, type Debt, type Account } from '../types'
 
 // ─── Presupuestos ─────────────────────────────────────────────────────────────
 export function Presupuestos() {
@@ -96,9 +97,10 @@ function BudgetForm({ budget, onSave, onClose }: { budget?:Budget; onSave:(b:Omi
 
 // ─── Metas ────────────────────────────────────────────────────────────────────
 export function Metas() {
-  const { goals, addGoal, updateGoal, deleteGoal } = useStore()
+  const { goals, accounts, addGoal, updateGoal, deleteGoal, contributeToGoal } = useStore()
   const { showToast } = useToast()
   const [editing, setEditing] = useState<Goal|null|'new'>(null)
+  const [contributing, setContributing] = useState<Goal|null>(null)
 
   const totalTarget = goals.reduce((s,g)=>s+g.target,0)
   const totalSaved  = goals.reduce((s,g)=>s+g.saved,0)
@@ -121,6 +123,7 @@ export function Metas() {
           const pct = g.target>0?Math.min(100,Math.round((g.saved/g.target)*100)):0
           const remaining = g.target-g.saved
           const days = Math.ceil((new Date(g.deadline).getTime()-Date.now())/(1000*60*60*24))
+          const account = g.accountId ? accounts.find(a=>a.id===g.accountId) : undefined
           return (
             <div key={g.id} style={{padding:'12px 0',borderBottom:'0.5px solid var(--border)'}}>
               <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',marginBottom:6}}>
@@ -129,12 +132,21 @@ export function Metas() {
                     {g.name}
                     {pct>=100&&<span className="tag tag-pos">Completada</span>}
                   </div>
+                  {account && (
+                    <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2,display:'flex',alignItems:'center',gap:6}}>
+                      <span style={{display:'inline-block',width:7,height:7,borderRadius:'50%',background:account.color}}/>
+                      {account.name}
+                    </div>
+                  )}
                   <div style={{fontSize:11,color:'var(--text-muted)',marginTop:2,fontFamily:'DM Mono,monospace'}}>
                     {fmt(g.saved)} / {fmt(g.target)} · {days>0?`${days} días restantes`:'Vencida'}
                   </div>
                 </div>
                 <div style={{display:'flex',alignItems:'center',gap:6}}>
                   <span style={{fontSize:16,fontFamily:'DM Mono,monospace',color:g.color}}>{pct}%</span>
+                  {pct<100 && (
+                    <button className="btn btn-ghost btn-sm" onClick={()=>setContributing(g)}>+ Aportar</button>
+                  )}
                   <button className="btn btn-ghost btn-sm" onClick={()=>setEditing(g)}>Editar</button>
                   <button className="btn btn-danger btn-sm" onClick={()=>{ deleteGoal(g.id); showToast('Meta eliminada') }}>×</button>
                 </div>
@@ -153,15 +165,40 @@ export function Metas() {
 
       {editing!==null&&(
         <Modal title={editing==='new'?'Nueva meta':'Editar meta'} onClose={()=>setEditing(null)}>
-          <GoalForm goal={editing==='new'?undefined:editing} onSave={(g)=>{ editing==='new'?addGoal(g):updateGoal((editing as Goal).id,g); showToast('Guardado'); setEditing(null) }} onClose={()=>setEditing(null)}/>
+          <GoalForm
+            goal={editing==='new'?undefined:editing}
+            accounts={accounts}
+            onSave={(g)=>{ editing==='new'?addGoal(g):updateGoal((editing as Goal).id,g); showToast('Guardado'); setEditing(null) }}
+            onClose={()=>setEditing(null)}
+          />
         </Modal>
+      )}
+
+      {contributing && (
+        <ContributeGoalModal
+          goal={contributing}
+          accounts={accounts}
+          onConfirm={(amount, fromAccountName) => {
+            contributeToGoal(contributing.id, amount, fromAccountName)
+            showToast('Aporte registrado')
+            setContributing(null)
+          }}
+          onClose={()=>setContributing(null)}
+        />
       )}
     </div>
   )
 }
 
-function GoalForm({ goal, onSave, onClose }: { goal?:Goal; onSave:(g:Omit<Goal,'id'>)=>void; onClose:()=>void }) {
-  const [f,setF]=useState({ name:goal?.name??'', target:goal?.target?.toString()??'', saved:goal?.saved?.toString()??'0', deadline:goal?.deadline??'', color:goal?.color??'#6c8fff' })
+function GoalForm({ goal, accounts, onSave, onClose }: { goal?:Goal; accounts:Account[]; onSave:(g:Omit<Goal,'id'>)=>void; onClose:()=>void }) {
+  const [f,setF]=useState({
+    name:goal?.name??'',
+    target:goal?.target?.toString()??'',
+    saved:goal?.saved?.toString()??'0',
+    deadline:goal?.deadline??'',
+    color:goal?.color??'#6c8fff',
+    accountId:goal?.accountId??'',
+  })
   const s=(k:string,v:string)=>setF(p=>({...p,[k]:v}))
   return <>
     <div className="form-group"><label className="form-label">Nombre de la meta</label><input className="form-input" placeholder="Ej: Fondo de emergencia" value={f.name} onChange={e=>s('name',e.target.value)}/></div>
@@ -173,9 +210,29 @@ function GoalForm({ goal, onSave, onClose }: { goal?:Goal; onSave:(g:Omit<Goal,'
       <div className="form-group"><label className="form-label">Fecha límite</label><input className="form-input" type="date" value={f.deadline} onChange={e=>s('deadline',e.target.value)}/></div>
       <div className="form-group"><label className="form-label">Color</label><input type="color" value={f.color} onChange={e=>s('color',e.target.value)} style={{width:'100%',height:36,borderRadius:8,border:'0.5px solid var(--border-mid)',cursor:'pointer'}}/></div>
     </div>
+    <div className="form-group">
+      <label className="form-label">Cuenta (opcional)</label>
+      <select
+        className="form-select"
+        value={f.accountId}
+        onChange={e=>s('accountId',e.target.value)}
+      >
+        <option value="">— Sin asignar —</option>
+        {accounts.map(a=>(
+          <option key={a.id} value={a.id}>{a.name}</option>
+        ))}
+      </select>
+    </div>
     <div className="form-actions">
       <button className="btn" onClick={onClose}>Cancelar</button>
-      <button className="btn btn-accent" onClick={()=>onSave({name:f.name,target:parseFloat(f.target)||0,saved:parseFloat(f.saved)||0,deadline:f.deadline,color:f.color})}>Guardar</button>
+      <button className="btn btn-accent" onClick={()=>onSave({
+        name:f.name,
+        target:parseFloat(f.target)||0,
+        saved:parseFloat(f.saved)||0,
+        deadline:f.deadline,
+        color:f.color,
+        accountId:f.accountId||undefined,
+      })}>Guardar</button>
     </div>
   </>
 }

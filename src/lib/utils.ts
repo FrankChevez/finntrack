@@ -1,4 +1,4 @@
-import type { FinanzasDB } from '../types'
+import type { FinanzasDB, Account, Transaction } from '../types'
 
 export const uid = () => Math.random().toString(36).slice(2, 10)
 
@@ -116,4 +116,46 @@ export function validateAndMigrateDB(raw: unknown): FinanzasDB {
     transfers:    Array.isArray(r.transfers)     ? r.transfers    : [],
     installments: Array.isArray(r.installments) ? r.installments : [],
   }
+}
+
+// ─── Emergency fund history ──────────────────────────────────────────────────
+// Reconstructs the total emergency fund value for the last N months by rewinding
+// transactions from the current account balance. Returns an array ordered
+// oldest → newest, one point per month.
+export function emergencyFundHistory(
+  accounts: Account[],
+  transactions: Transaction[],
+  months: number = 6
+): { month: string; total: number }[] {
+  const emergencyAccounts = accounts.filter(a => a.emergencyFund)
+  if (emergencyAccounts.length === 0) return []
+
+  // Build list of YYYY-MM strings from (months-1) ago to current, inclusive.
+  const nowYM = currentYM()
+  const labels: string[] = []
+  for (let i = months - 1; i >= 0; i--) {
+    labels.push(addMonths(nowYM, -i))
+  }
+
+  // For each label (month), compute end-of-month historical balance per account,
+  // apply emergencyPct, and sum across accounts.
+  return labels.map(ym => {
+    const [y, m] = ym.split('-').map(Number)
+    // Last day of month YM. Using Date(y, m, 0): m is 1-based month, day 0 rolls to last day of previous month → effectively last day of month `m`.
+    const endOfMonth = new Date(y, m, 0).toISOString().slice(0, 10)
+
+    let total = 0
+    for (const acc of emergencyAccounts) {
+      // Net effect of transactions after endOfMonth on this account (by name match)
+      const netAfter = transactions
+        .filter(t => t.account === acc.name && t.date > endOfMonth)
+        .reduce((s, t) => s + t.amount, 0)
+      // Historical balance = current balance - net amount that happened after that date
+      const historicalBalance = acc.balance - netAfter
+      const pct = acc.emergencyPct ?? 100
+      total += historicalBalance * (pct / 100)
+    }
+
+    return { month: ym, total: parseFloat(total.toFixed(2)) }
+  })
 }

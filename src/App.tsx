@@ -11,6 +11,8 @@ import { Cuentas } from './pages/Cuentas'
 import { Presupuestos, Metas, Deudas } from './pages/Objetivos'
 import { Transferencias, Recurrentes, Cuotas } from './pages/Herramientas'
 import { EstadoCuenta } from './pages/EstadoCuenta'
+import { useAutoWrapped } from './hooks/useAutoWrapped'
+import { WrappedView } from './components/wrapped/WrappedView'
 import './styles/globals.css'
 
 type Page = 'dashboard'|'cuentas'|'gastos'|'presupuestos'|'metas'|'deudas'|'transferencias'|'recurrentes'|'cuotas'|'reporte'|'estados'
@@ -27,7 +29,8 @@ const ADD_LABELS: Partial<Record<Page,string>> = {
 
 export default function App() {
   const [page, setPage] = useState<Page>('dashboard')
-  const theme = useStore(s => s.theme)
+  const { theme, accounts, cards, transactions, budgets, goals, debts, recurring, transfers, installments } = useStore()
+  const { target, markSeen } = useAutoWrapped(transactions)
 
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme)
@@ -55,6 +58,14 @@ export default function App() {
         </div>
         <BottomNav current={page} onChange={(p) => setPage(p as Page)} />
       </div>
+      {target && (
+        <WrappedView
+          type={target.type}
+          period={target.period}
+          db={{ accounts, cards, transactions, budgets, goals, debts, recurring, transfers, installments }}
+          onClose={() => markSeen(target)}
+        />
+      )}
     </ToastProvider>
   )
 }
