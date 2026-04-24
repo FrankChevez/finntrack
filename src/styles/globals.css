@@ -572,7 +572,7 @@ html, body, #root {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 12px 20px;
+  padding: calc(12px + env(safe-area-inset-top)) 20px 12px;
   background: linear-gradient(to bottom, rgba(0,0,0,0.4), transparent);
   color: #fff;
   pointer-events: none;
@@ -620,13 +620,13 @@ html, body, #root {
 }
 
 .wrapped-section {
-  min-height: 100vh;
+  min-height: 100dvh;
   scroll-snap-align: start;
   display: flex;
   flex-direction: column;
   align-items: center;
   justify-content: center;
-  padding: 80px 24px 60px;
+  padding: calc(80px + env(safe-area-inset-top)) 24px calc(60px + env(safe-area-inset-bottom));
   color: #fff;
   text-align: center;
   position: relative;
@@ -728,14 +728,25 @@ html, body, #root {
   gap: 12px;
   align-items: flex-end;
 }
-.wrapped-reporte-card .form-group { margin-bottom: 0; min-width: 180px; }
+.wrapped-reporte-card .form-group { margin-bottom: 0; min-width: 180px; flex: 1; }
+.wrapped-reporte-card .btn { min-height: 40px; }
+@media (max-width: 640px) {
+  .wrapped-reporte-card { flex-direction: column; align-items: stretch; }
+  .wrapped-reporte-card .form-group { width: 100%; }
+  .wrapped-reporte-card .btn { width: 100%; }
+}
 
 /* ─── Asistente chat ─────────────────────────────────────────────────────── */
 .chat-page {
   display: flex;
   flex-direction: column;
-  height: calc(100vh - 80px);
+  height: calc(100dvh - 120px);
   min-height: 0;
+}
+@media (max-width: 768px) {
+  .chat-page {
+    height: calc(100dvh - 128px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+  }
 }
 
 .chat-header {
@@ -985,4 +996,18 @@ html, body, #root {
   background: var(--bg-elevated);
   color: var(--text-primary);
   border-color: var(--border-mid);
+}
+
+/* ─── Dashboard emergency fund card ──────────────────────────────────────── */
+.emergency-fund-grid {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) 1fr;
+  gap: 20px;
+  align-items: center;
+}
+@media (max-width: 640px) {
+  .emergency-fund-grid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
 }

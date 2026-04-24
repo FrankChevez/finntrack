@@ -126,7 +126,7 @@ export default function Dashboard({ onNavigate }: { onNavigate: (p: string) => v
           <div className="card-header">
             <span className="card-title">Fondo de emergencia</span>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'minmax(180px,240px) 1fr',gap:20,alignItems:'center'}}>
+          <div className="emergency-fund-grid">
             <div>
               <div style={{fontSize:11,color:'var(--text-muted)',marginBottom:4}}>Actual</div>
               <div style={{fontSize:24,fontFamily:'DM Mono,monospace',fontWeight:600,color:'var(--accent)'}}>
