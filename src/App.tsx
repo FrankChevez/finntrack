@@ -66,7 +66,7 @@ export default function App() {
         <BottomNav current={page} onChange={(p) => setPage(p as Page)} />
       </div>
 
-    {!target && (
+    {!target && !quickAddOpen && (
       <FAB onClick={() => setQuickAddOpen(true)} />
     )}
 
