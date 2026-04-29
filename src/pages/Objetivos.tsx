@@ -239,7 +239,7 @@ function GoalForm({ goal, accounts, onSave, onClose }: { goal?:Goal; accounts:Ac
 
 // ─── Deudas ───────────────────────────────────────────────────────────────────
 export function Deudas() {
-  const { debts, accounts, addDebt, updateDebt, deleteDebt, payDebt } = useStore()
+  const { debts, accounts, cards, addDebt, updateDebt, deleteDebt, payDebt } = useStore()
   const { showToast } = useToast()
   const [editing, setEditing] = useState<Debt|null|'new'>(null)
   const [payingDebt, setPayingDebt] = useState<Debt|null>(null)
@@ -306,8 +306,9 @@ export function Deudas() {
           title={`Pagar ${payingDebt.name}`}
           maxAmount={payingDebt.remaining}
           accounts={accounts}
-          onConfirm={(amount, accountName) => {
-            payDebt(payingDebt.id, amount, accountName)
+          cards={cards}
+          onConfirm={(amount, sourceName) => {
+            payDebt(payingDebt.id, amount, sourceName)
             showToast(`Pago de ${payingDebt.name} registrado`)
             setPayingDebt(null)
           }}

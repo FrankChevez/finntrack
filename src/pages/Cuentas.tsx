@@ -119,8 +119,10 @@ export function Cuentas() {
           title={`Pagar ${payingCard.name}`}
           maxAmount={payingCard.balance}
           accounts={accounts}
-          onConfirm={(amount, accountName) => {
-            payCard(payingCard.id, amount, accountName)
+          cards={cards}
+          excludeCardId={payingCard.id}
+          onConfirm={(amount, sourceName) => {
+            payCard(payingCard.id, amount, sourceName)
             showToast(`Pago de ${payingCard.name} registrado`)
             setPayingCard(null)
           }}

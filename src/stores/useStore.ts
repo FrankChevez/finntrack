@@ -51,8 +51,8 @@ interface FinanzasState extends FinanzasDB {
   updateInstallment: (id: string, i: Partial<Installment>) => void
   deleteInstallment: (id: string) => void
   payInstallment: (id: string) => void
-  payCard: (cardId: string, amount: number, accountName: string) => void
-  payDebt: (debtId: string, amount: number, accountName: string) => void
+  payCard: (cardId: string, amount: number, sourceName: string) => void
+  payDebt: (debtId: string, amount: number, sourceName: string) => void
   // ─── Asistente ───
   addAssistantMessage: (m: Omit<AssistantMessage, 'id'|'timestamp'>) => void
   clearAssistantMessages: () => void
@@ -93,44 +93,57 @@ export const useStore = create<FinanzasState>()(
       updateCard: (id, c) => set((s) => ({ cards: s.cards.map((x) => x.id === id ? { ...x, ...c } : x) })),
       deleteCard: (id) => set((s) => ({ cards: s.cards.filter((x) => x.id !== id) })),
 
-      payCard: (cardId, amount, accountName) => {
+      payCard: (cardId, amount, sourceName) => {
         set((s) => {
           const card = s.cards.find((c) => c.id === cardId)
           if (!card) return {}
+          const sourceIsAccount = s.accounts.some((a) => a.name === sourceName)
           const tx: Transaction = {
             id: uid(),
             date: new Date().toISOString().slice(0, 10),
             desc: `Pago ${card.name}`,
             cat: 'Pago tarjeta',
             amount: -amount,
-            account: accountName,
+            account: sourceName,
             type: 'expense',
           }
           return {
             transactions: [...s.transactions, tx],
-            cards: s.cards.map((c) => c.id === cardId ? { ...c, balance: Math.max(0, c.balance - amount) } : c),
-            accounts: s.accounts.map((a) => a.name === accountName ? { ...a, balance: a.balance - amount } : a),
+            cards: s.cards.map((c) => {
+              if (c.id === cardId) return { ...c, balance: Math.max(0, c.balance - amount) }
+              if (!sourceIsAccount && c.name === sourceName) return { ...c, balance: c.balance + amount }
+              return c
+            }),
+            accounts: sourceIsAccount
+              ? s.accounts.map((a) => a.name === sourceName ? { ...a, balance: a.balance - amount } : a)
+              : s.accounts,
           }
         })
       },
 
-      payDebt: (debtId, amount, accountName) => {
+      payDebt: (debtId, amount, sourceName) => {
         set((s) => {
           const debt = s.debts.find((d) => d.id === debtId)
           if (!debt) return {}
+          const sourceIsAccount = s.accounts.some((a) => a.name === sourceName)
           const tx: Transaction = {
             id: uid(),
             date: new Date().toISOString().slice(0, 10),
             desc: `Pago ${debt.name}`,
             cat: 'Pago deuda',
             amount: -amount,
-            account: accountName,
+            account: sourceName,
             type: 'expense',
           }
           return {
             transactions: [...s.transactions, tx],
             debts: s.debts.map((d) => d.id === debtId ? { ...d, remaining: Math.max(0, d.remaining - amount) } : d),
-            accounts: s.accounts.map((a) => a.name === accountName ? { ...a, balance: a.balance - amount } : a),
+            accounts: sourceIsAccount
+              ? s.accounts.map((a) => a.name === sourceName ? { ...a, balance: a.balance - amount } : a)
+              : s.accounts,
+            cards: !sourceIsAccount
+              ? s.cards.map((c) => c.name === sourceName ? { ...c, balance: c.balance + amount } : c)
+              : s.cards,
           }
         })
       },
