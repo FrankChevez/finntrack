@@ -2,6 +2,7 @@ import { useState, useMemo } from 'react'
 import { useStore } from '../stores/useStore'
 import { fmt, currentYM } from '../lib/utils'
 import { Modal } from '../components/ui/Modal'
+import { PayModal } from '../components/ui/PayModal'
 import { useToast } from '../components/ui/Toast'
 import { CATS, type RecurringItem, type Installment } from '../types'
 
@@ -159,9 +160,10 @@ function RecurringForm({ item, accounts, onSave, onClose }: { item?:RecurringIte
 
 // ─── Cuotas ───────────────────────────────────────────────────────────────────
 export function Cuotas() {
-  const { installments, addInstallment, updateInstallment, deleteInstallment, payInstallment, cards } = useStore()
+  const { installments, addInstallment, updateInstallment, deleteInstallment, payInstallment, accounts, cards } = useStore()
   const { showToast } = useToast()
   const [editing, setEditing] = useState<Installment|null|'new'>(null)
+  const [payingInst, setPayingInst] = useState<Installment|null>(null)
   const ym = currentYM()
 
   const active = installments.filter(i=>i.paid<i.cuotas)
@@ -193,7 +195,7 @@ export function Cuotas() {
               <div><div className="row-main">{i.desc}</div><div className="row-sub">{i.card} · Cuota {i.paid+1} de {i.cuotas}</div></div>
               <div style={{display:'flex',alignItems:'center',gap:10}}>
                 <span className="amount neg">{fmt(i.cuotaAmt)}</span>
-                <button className="btn btn-accent btn-sm" onClick={()=>{ payInstallment(i.id); showToast('Cuota registrada') }}>Pagar</button>
+                <button className="btn btn-accent btn-sm" onClick={()=>setPayingInst(i)}>Pagar</button>
               </div>
             </div>
           ))}
@@ -236,6 +238,20 @@ export function Cuotas() {
             onClose={()=>setEditing(null)}
           />
         </Modal>
+      )}
+      {payingInst && (
+        <PayModal
+          title={`Pagar cuota ${payingInst.paid+1}/${payingInst.cuotas} · ${payingInst.desc}`}
+          maxAmount={payingInst.cuotaAmt}
+          accounts={accounts}
+          cards={cards.filter(c => c.name !== payingInst.card)}
+          onConfirm={(amount, sourceName) => {
+            payInstallment(payingInst.id, sourceName, amount)
+            showToast('Cuota registrada')
+            setPayingInst(null)
+          }}
+          onClose={() => setPayingInst(null)}
+        />
       )}
     </div>
   )

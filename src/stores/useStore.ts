@@ -50,7 +50,7 @@ interface FinanzasState extends FinanzasDB {
   addInstallment: (i: Omit<Installment, 'id'>) => void
   updateInstallment: (id: string, i: Partial<Installment>) => void
   deleteInstallment: (id: string) => void
-  payInstallment: (id: string) => void
+  payInstallment: (id: string, sourceName: string, amount?: number) => void
   payCard: (cardId: string, amount: number, sourceName: string) => void
   payDebt: (debtId: string, amount: number, sourceName: string) => void
   // ─── Asistente ───
@@ -310,25 +310,31 @@ export const useStore = create<FinanzasState>()(
       addInstallment: (i) => set((s) => ({ installments: [...s.installments, { ...i, id: uid() }] })),
       updateInstallment: (id, i) => set((s) => ({ installments: s.installments.map((x) => x.id === id ? { ...x, ...i } : x) })),
       deleteInstallment: (id) => set((s) => ({ installments: s.installments.filter((x) => x.id !== id) })),
-      payInstallment: (id) => {
+      payInstallment: (id, sourceName, amount) => {
         set((s) => {
           const inst = s.installments.find((x) => x.id === id)
           if (!inst || inst.paid >= inst.cuotas) return {}
+          const amt = amount ?? inst.cuotaAmt
+          const sourceIsAccount = s.accounts.some((a) => a.name === sourceName)
           const tx: Transaction = {
             id: uid(),
             date: new Date().toISOString().slice(0, 10),
             desc: `${inst.desc} (cuota ${inst.paid + 1}/${inst.cuotas})`,
             cat: inst.cat,
-            amount: -inst.cuotaAmt,
-            account: inst.card,
+            amount: -amt,
+            account: sourceName,
             type: 'expense',
           }
-          const cards = s.cards.map((c) =>
-            c.name === inst.card ? { ...c, balance: Math.max(0, c.balance - inst.cuotaAmt) } : c
-          )
           return {
             transactions: [...s.transactions, tx],
-            cards,
+            cards: s.cards.map((c) => {
+              if (c.name === inst.card) return { ...c, balance: Math.max(0, c.balance - amt) }
+              if (!sourceIsAccount && c.name === sourceName) return { ...c, balance: c.balance + amt }
+              return c
+            }),
+            accounts: sourceIsAccount
+              ? s.accounts.map((a) => a.name === sourceName ? { ...a, balance: a.balance - amt } : a)
+              : s.accounts,
             installments: s.installments.map((x) => x.id === id ? { ...x, paid: x.paid + 1 } : x),
           }
         })
