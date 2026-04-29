@@ -260,12 +260,17 @@ export function Cuotas() {
 function InstallmentForm({ inst, cardNames, onSave, onClose }: { inst?:Installment; cardNames:string[]; onSave:(i:Omit<Installment,'id'>)=>void; onClose:()=>void }) {
   const [f,setF]=useState({ desc:inst?.desc??'', total:inst?.total?.toString()??'', cuotas:inst?.cuotas?.toString()??'', cuotaAmt:inst?.cuotaAmt?.toString()??'', card:inst?.card??(cardNames[0]??''), cat:inst?.cat??'Tecnología', startDate:inst?.startDate??new Date().toISOString().slice(0,10), paid:inst?.paid?.toString()??'0' })
   const s=(k:string,v:string)=>setF(p=>({...p,[k]:v}))
-  const calcCuota=()=>{ const t=parseFloat(f.total),c=parseInt(f.cuotas); if(t>0&&c>0) s('cuotaAmt',(t/c).toFixed(2)) }
+  const updateAndCalc=(k:'total'|'cuotas',v:string)=>setF(p=>{
+    const next={...p,[k]:v}
+    const t=parseFloat(next.total),c=parseInt(next.cuotas)
+    if(t>0&&c>0) next.cuotaAmt=(t/c).toFixed(2)
+    return next
+  })
   return <>
     <div className="form-group"><label className="form-label">Descripción</label><input className="form-input" placeholder="Ej: Televisor LG" value={f.desc} onChange={e=>s('desc',e.target.value)}/></div>
     <div className="form-row">
-      <div className="form-group"><label className="form-label">Monto total ($)</label><input className="form-input" type="number" step="0.01" value={f.total} onChange={e=>{ s('total',e.target.value); setTimeout(calcCuota,0) }}/></div>
-      <div className="form-group"><label className="form-label">Número de cuotas</label><input className="form-input" type="number" min="1" value={f.cuotas} onChange={e=>{ s('cuotas',e.target.value); setTimeout(calcCuota,0) }}/></div>
+      <div className="form-group"><label className="form-label">Monto total ($)</label><input className="form-input" type="number" step="0.01" value={f.total} onChange={e=>updateAndCalc('total',e.target.value)}/></div>
+      <div className="form-group"><label className="form-label">Número de cuotas</label><input className="form-input" type="number" min="1" value={f.cuotas} onChange={e=>updateAndCalc('cuotas',e.target.value)}/></div>
     </div>
     <div className="form-group"><label className="form-label">Cuota mensual ($)</label><input className="form-input" type="number" step="0.01" value={f.cuotaAmt} onChange={e=>s('cuotaAmt',e.target.value)}/></div>
     <div className="form-row">
