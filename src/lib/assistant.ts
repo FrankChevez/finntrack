@@ -9,7 +9,7 @@ export interface AssistantAnswer {
 }
 
 export type QuestionCategory = 'gastos' | 'ingresos' | 'metas' | 'presupuestos' | 'deudas' | 'cuentas' | 'insights'
-export type QuestionParam = 'goal' | 'category' | 'account'
+export type QuestionParam = 'goal' | 'category' | 'account' | 'afford'
 
 export interface AssistantQuestion {
   id: string
@@ -420,6 +420,83 @@ export const QUESTIONS: AssistantQuestion[] = [
       return {
         text: 'Aquí tienes 3 observaciones sobre tus finanzas:',
         list: insights.slice(0, 3).map((i, idx) => ({ main: `${idx + 1}. ${i}` })),
+      }
+    },
+  },
+
+  // === ¿ME LO PUEDO PERMITIR? ===
+  {
+    id: 'can-i-afford',
+    label: '¿Me puedo permitir esta compra?',
+    category: 'cuentas',
+    needsParam: 'afford',
+    answer: (db, param) => {
+      if (!param) return { text: 'Necesito un monto y al menos una cuenta.' }
+      const parts = param.split('|')
+      const amount = parseFloat(parts[0])
+      const accountNames = parts.slice(1).filter(Boolean)
+      if (!Number.isFinite(amount) || amount <= 0 || accountNames.length === 0) {
+        return { text: 'Necesito un monto válido y al menos una cuenta.' }
+      }
+      const accounts = db.accounts.filter((a) => accountNames.includes(a.name))
+      if (accounts.length === 0) return { text: 'No encontré las cuentas seleccionadas.' }
+
+      const ym = currentYM()
+
+      // Recurrentes pendientes este mes, agrupados por cuenta
+      const recurringByAcc: Record<string, number> = {}
+      for (const r of db.recurring) {
+        if (r.lastPaid !== ym) recurringByAcc[r.account] = (recurringByAcc[r.account] || 0) + r.amount
+      }
+
+      // Cuotas pendientes que vencen este mes (compromiso global, no asignado a cuenta)
+      const [cy, cm] = ym.split('-').map(Number)
+      const installmentsDue = db.installments
+        .filter((i) => i.paid < i.cuotas)
+        .filter((i) => {
+          const [sy, sm] = i.startDate.slice(0, 7).split('-').map(Number)
+          const elapsed = (cy - sy) * 12 + (cm - sm)
+          return elapsed >= i.paid && elapsed < i.cuotas
+        })
+        .reduce((s, i) => s + i.cuotaAmt, 0)
+
+      const perAccount = accounts.map((a) => {
+        const recPending = recurringByAcc[a.name] || 0
+        const emergencyReserve = a.emergencyFund ? a.balance * ((a.emergencyPct ?? 100) / 100) : 0
+        const afterRecurring = a.balance - recPending
+        const safeMargin = afterRecurring - emergencyReserve
+        return { name: a.name, balance: a.balance, recPending, afterRecurring, safeMargin, emergencyReserve }
+      })
+
+      const totalAfterRecurring = perAccount.reduce((s, l) => s + l.afterRecurring, 0)
+      const totalSafe = perAccount.reduce((s, l) => s + l.safeMargin, 0)
+      const totalAvailable = totalAfterRecurring - installmentsDue
+      const totalSafeAvailable = totalSafe - installmentsDue
+
+      let verdict: string
+      if (amount > totalAvailable) {
+        verdict = `❌ **No te alcanza.** Te faltarían ${fmt(amount - totalAvailable)} aun cubriendo solo lo esencial del mes.`
+      } else if (amount > totalSafeAvailable) {
+        const usado = amount - totalSafeAvailable
+        verdict = `⚠️ **Te quedarías al límite.** Cubre la compra, pero gastarías ${fmt(usado)} de tu colchón de emergencia.`
+      } else {
+        verdict = `✅ **Sí podés.** Te quedarían ${fmt(totalSafeAvailable - amount)} de margen seguro después.`
+      }
+
+      const list: AssistantAnswer['list'] = perAccount.map((l) => ({
+        main: l.name,
+        sub: l.recPending > 0
+          ? `${fmt(l.balance)} − ${fmt(l.recPending)} recurrentes${l.emergencyReserve > 0 ? ` − ${fmt(l.emergencyReserve)} emergencia` : ''}`
+          : l.emergencyReserve > 0 ? `${fmt(l.balance)} − ${fmt(l.emergencyReserve)} emergencia` : `Saldo ${fmt(l.balance)}`,
+        amount: fmt(l.safeMargin),
+      }))
+      if (installmentsDue > 0) {
+        list.push({ main: 'Cuotas del mes pendientes', sub: 'compromiso global', amount: `−${fmt(installmentsDue)}` })
+      }
+
+      return {
+        text: `Para una compra de **${fmt(amount)}**: ${verdict} Disponible total: ${fmt(totalAvailable)} · margen seguro: ${fmt(totalSafeAvailable)}.`,
+        list,
       }
     },
   },

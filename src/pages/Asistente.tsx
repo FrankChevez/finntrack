@@ -15,6 +15,7 @@ export default function Asistente() {
   const pendingTimers = useRef<Set<ReturnType<typeof setTimeout>>>(new Set())
   const [typing, setTyping] = useState(false)
   const [pendingParam, setPendingParam] = useState<{ questionId: string; param: QuestionParam } | null>(null)
+  const [affordPending, setAffordPending] = useState<{ questionId: string } | null>(null)
   const [suggested, setSuggested] = useState<string[]>([])
 
   // Schedule a timer and track it so it can be cleared if component unmounts
@@ -68,6 +69,24 @@ export default function Asistente() {
     if (!q) return
 
     addAssistantMessage({ role: 'user', text: q.label })
+
+    if (q.needsParam === 'afford') {
+      if (store.accounts.length === 0) {
+        setTyping(true)
+        schedule(() => {
+          setTyping(false)
+          addAssistantMessage({ role: 'bot', text: 'No tienes cuentas configuradas aún.' })
+        }, 400)
+        return
+      }
+      setTyping(true)
+      schedule(() => {
+        setTyping(false)
+        addAssistantMessage({ role: 'bot', text: 'Dime el monto y elige una o varias cuentas:' })
+        setAffordPending({ questionId })
+      }, 400)
+      return
+    }
 
     if (q.needsParam) {
       const options = listParams(buildDb(), q.needsParam)
@@ -141,7 +160,34 @@ export default function Asistente() {
     addAssistantMessage({ role: 'bot', text: 'Entendido, cancelado. ¿Qué más quieres preguntar?' })
   }
 
+  const handleAffordSubmit = (amount: number, accountNames: string[]) => {
+    if (!affordPending) return
+    const q = getQuestion(affordPending.questionId)
+    if (!q) {
+      setAffordPending(null)
+      return
+    }
+    const paramId = [amount.toString(), ...accountNames].join('|')
+    addAssistantMessage({ role: 'user', text: `${amount} desde ${accountNames.join(', ')}` })
+    setAffordPending(null)
+    setTyping(true)
+    schedule(() => {
+      setTyping(false)
+      const ans = q.answer(buildDb(), paramId)
+      addAssistantMessage({ role: 'bot', text: ans.text, list: ans.list })
+      setSuggested(ans.followUps ?? [])
+    }, 450)
+  }
+
+  const handleAffordCancel = () => {
+    setAffordPending(null)
+    addAssistantMessage({ role: 'bot', text: 'Entendido, cancelado. ¿Qué más quieres preguntar?' })
+  }
+
   const paramOptions = pendingParam ? listParams(buildDb(), pendingParam.param) : undefined
+  const affordMode = affordPending
+    ? { accounts: store.accounts, onSubmit: handleAffordSubmit, onCancel: handleAffordCancel }
+    : undefined
 
   return (
     <div className="page-enter chat-page">
@@ -170,6 +216,7 @@ export default function Asistente() {
         paramOptions={paramOptions}
         onPickParam={handleParamPick}
         onCancelParam={handleCancelParam}
+        affordMode={affordMode}
         suggested={suggested}
       />
     </div>
